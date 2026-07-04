@@ -208,11 +208,12 @@
   // ---------- refresh geral ----------
   window.refresh = () => {
     populateFilters();
-    if (state.view === 'dashboard') Dashboard.render(Storage.all());
+    const filtered = applyFilters(Storage.all());
+    if (state.view === 'dashboard') Dashboard.render(filtered);
     if (state.view === 'table') renderTable();
-    if (state.view === 'kanban') Kanban.render(Storage.all());
-    if (state.view === 'calendar') CalendarView.render(Storage.all());
-    if (state.view === 'stats') Charts.render(Storage.all());
+    if (state.view === 'kanban') Kanban.render(filtered);
+    if (state.view === 'calendar') CalendarView.render(filtered);
+    if (state.view === 'stats') Charts.render(filtered);
     if (state.view === 'settings') {
       Settings.renderUsers();
       Settings.renderCols();
