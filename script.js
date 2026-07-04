@@ -213,6 +213,10 @@
     if (state.view === 'kanban') Kanban.render(Storage.all());
     if (state.view === 'calendar') CalendarView.render(Storage.all());
     if (state.view === 'stats') Charts.render(Storage.all());
+    if (state.view === 'settings') {
+      Settings.renderUsers();
+      Settings.renderCols();
+    }
   };
   const refresh = window.refresh;
 

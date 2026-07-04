@@ -96,7 +96,7 @@ const Settings = (() => {
     }
   };
 
-  return { init, delUser, delCol, updateColColor, renderCols };
+  return { init, delUser, delCol, updateColColor, renderCols, renderUsers };
 })();
 
 document.addEventListener('DOMContentLoaded', Settings.init);
