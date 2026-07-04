@@ -1,0 +1,452 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>SGP Tasks — Gestão de Tarefas da Produção</title>
+<link rel="stylesheet" href="style.css" />
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" />
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head>
+<body>
+<div id="loginScreen" class="login-screen">
+  <div class="login-box">
+    <h2><i class="fa-solid fa-lock"></i> SGP Tasks</h2>
+    <p class="muted">Digite seu PIN de acesso</p>
+    <div class="pin-display" id="pinDisplay">_ _</div>
+    <div class="numpad">
+      <button class="num-btn" data-val="1">1</button>
+      <button class="num-btn" data-val="2">2</button>
+      <button class="num-btn" data-val="3">3</button>
+      <button class="num-btn" data-val="4">4</button>
+      <button class="num-btn" data-val="5">5</button>
+      <button class="num-btn" data-val="6">6</button>
+      <button class="num-btn" data-val="7">7</button>
+      <button class="num-btn" data-val="8">8</button>
+      <button class="num-btn" data-val="9">9</button>
+      <button class="num-btn btn-clear" id="btnClearPin"><i class="fa-solid fa-delete-left"></i></button>
+      <button class="num-btn" data-val="0">0</button>
+      <button class="num-btn btn-enter" id="btnEnterPin"><i class="fa-solid fa-arrow-right-to-bracket"></i></button>
+    </div>
+  </div>
+</div>
+
+<div class="layout" id="appLayout" style="display:none;">
+<!-- ============ SIDEBAR ============ -->
+<aside class="sidebar" id="sidebar">
+  <div class="brand">
+    <div class="brand-logo"><i class="fa-solid fa-industry"></i></div>
+    <div>
+      <div class="brand-name">SGP <span>Tasks</span></div>
+      <div class="brand-sub">Gestão da Produção</div>
+    </div>
+  </div>
+
+  <nav class="nav">
+    <button class="nav-item active" data-view="dashboard"><i class="fa-solid fa-gauge-high"></i><span>Dashboard</span></button>
+    <button class="nav-item" data-view="table"><i class="fa-solid fa-table-list"></i><span>Tarefas</span></button>
+    <button class="nav-item" data-view="kanban"><i class="fa-solid fa-columns"></i><span>Kanban</span></button>
+    <button class="nav-item" data-view="calendar"><i class="fa-solid fa-calendar-days"></i><span>Calendário</span></button>
+    <button class="nav-item" data-view="stats"><i class="fa-solid fa-chart-pie"></i><span>Estatísticas</span></button>
+    <button class="nav-item admin-only" data-view="chat-admin" id="nav-chat-admin"><i class="fa-solid fa-headset"></i><span>Atendimento</span></button>
+    <button class="nav-item" data-view="settings" id="nav-settings" style="display:none;"><i class="fa-solid fa-gear"></i><span>Configurações</span></button>
+  </nav>
+
+  <div class="sidebar-foot">
+    <button id="btnTheme" class="icon-btn" title="Alternar tema"><i class="fa-solid fa-moon"></i></button>
+    <button id="btnExport" class="icon-btn" title="Exportar CSV"><i class="fa-solid fa-file-export"></i></button>
+    <button id="btnImport" class="icon-btn" title="Importar JSON"><i class="fa-solid fa-file-import"></i></button>
+    <button id="btnPrint" class="icon-btn" title="Imprimir"><i class="fa-solid fa-print"></i></button>
+    <input type="file" id="importFile" accept="application/json,.json" hidden />
+  </div>
+</aside>
+
+<!-- ============ MAIN ============ -->
+<main class="main">
+  <header class="topbar">
+    <div class="topbar-left">
+      <button class="icon-btn only-mobile" id="btnMenu"><i class="fa-solid fa-bars"></i></button>
+      <div class="search-wrap">
+        <i class="fa-solid fa-magnifying-glass"></i>
+        <input type="search" id="globalSearch" placeholder="Buscar por número, cliente, descrição, responsável, localização..." />
+      </div>
+    </div>
+    <div class="topbar-right">
+      <button class="btn btn-ghost" id="btnFilterCols" style="display:none;"><i class="fa-solid fa-filter"></i> Colunas</button>
+      <button class="btn btn-ghost" id="btnLogout" onclick="Auth.logout()"><i class="fa-solid fa-right-from-bracket"></i> Sair</button>
+      <button class="btn btn-primary" id="btnNewTask"><i class="fa-solid fa-plus"></i> Nova Tarefa</button>
+    </div>
+  </header>
+
+  <!-- ============ DASHBOARD VIEW ============ -->
+  <section class="view" id="view-dashboard">
+    <div class="page-head">
+      <div>
+        <h1>Dashboard</h1>
+        <p class="muted">Visão geral em tempo real da produção</p>
+      </div>
+    </div>
+
+    <div class="kpi-grid" id="kpiGrid"></div>
+
+    <div class="alerts-panel" id="alertsPanel"></div>
+
+    <div class="dash-lower">
+      <div class="card">
+        <div class="card-head"><h3><i class="fa-solid fa-triangle-exclamation"></i> Vencendo em breve</h3></div>
+        <div class="card-body" id="dashUpcoming"></div>
+      </div>
+      <div class="card">
+        <div class="card-head"><h3><i class="fa-solid fa-clock-rotate-left"></i> Atividade recente</h3></div>
+        <div class="card-body" id="dashActivity"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ TABLE VIEW ============ -->
+  <section class="view hidden" id="view-table">
+    <div class="page-head">
+      <div>
+        <h1>Tarefas</h1>
+        <p class="muted" id="tableCount"></p>
+      </div>
+    </div>
+
+    <div class="filters card">
+      <div class="filters-grid">
+        <div class="field"><label>Situação</label>
+          <select id="fSituacao"><option value="">Todas</option></select></div>
+        <div class="field"><label>Prioridade</label>
+          <select id="fPrioridade"><option value="">Todas</option></select></div>
+        <div class="field"><label>Responsável</label>
+          <select id="fResponsavel"><option value="">Todos</option></select></div>
+        <div class="field"><label>Localização</label>
+          <select id="fLocalizacao"><option value="">Todas</option></select></div>
+        <div class="field"><label>Mês</label>
+          <select id="fMes"><option value="">Todos</option></select></div>
+        <div class="field"><label>Ano</label>
+          <select id="fAno"><option value="">Todos</option></select></div>
+        <div class="field"><label>Data inicial</label><input type="date" id="fDataIni" /></div>
+        <div class="field"><label>Data final</label><input type="date" id="fDataFim" /></div>
+        <div class="field field-actions">
+          <label>&nbsp;</label>
+          <button class="btn btn-ghost" id="btnClearFilters"><i class="fa-solid fa-eraser"></i> Limpar</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="card no-pad">
+      <div class="table-wrap">
+        <table class="tbl">
+          <thead>
+            <tr id="tblHead">
+              <th data-sort="numero">Nº</th>
+              <th data-sort="cliente">Cliente</th>
+              <th data-sort="descricao">Descrição</th>
+              <th data-sort="prioridade">Prioridade</th>
+              <th data-sort="responsavel">Responsável</th>
+              <th data-sort="dataInicio">Início</th>
+              <th data-sort="prazo">Prazo</th>
+              <th data-sort="localizacao">Localização</th>
+              <th data-sort="dataProducao">Produção</th>
+              <th data-sort="dataEmbalagem">Embalagem</th>
+              <th data-sort="situacao">Situação</th>
+              <th data-sort="_dias">Dias</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody id="tblBody"></tbody>
+        </table>
+        <div id="tblEmpty" class="empty hidden">
+          <i class="fa-regular fa-folder-open"></i>
+          <h3>Nenhuma tarefa encontrada</h3>
+          <p>Ajuste os filtros ou cadastre uma nova tarefa.</p>
+        </div>
+      </div>
+      <div class="pagination">
+        <div class="pag-left">
+          <label>Por página:</label>
+          <select id="pageSize">
+            <option>20</option><option>50</option><option>100</option><option>200</option>
+          </select>
+        </div>
+        <div class="pag-right" id="pagControls"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ KANBAN VIEW ============ -->
+  <section class="view hidden" id="view-kanban">
+    <div class="page-head">
+      <div><h1>Kanban</h1><p class="muted">Arraste os cartões entre as colunas</p></div>
+    </div>
+    <div class="kanban" id="kanban"></div>
+  </section>
+
+  <!-- ============ CALENDAR VIEW ============ -->
+  <section class="view hidden" id="view-calendar">
+    <div class="page-head">
+      <div><h1>Calendário</h1><p class="muted">Tarefas por prazo</p></div>
+      <div class="cal-nav">
+        <button class="btn btn-ghost" id="calPrev"><i class="fa-solid fa-chevron-left"></i></button>
+        <div class="cal-title" id="calTitle"></div>
+        <button class="btn btn-ghost" id="calNext"><i class="fa-solid fa-chevron-right"></i></button>
+        <button class="btn btn-ghost" id="calToday">Hoje</button>
+      </div>
+    </div>
+    <div class="card"><div class="cal-grid-head" id="calGridHead"></div><div class="cal-grid" id="calGrid"></div></div>
+  </section>
+
+  <!-- ============ STATS VIEW ============ -->
+  <section class="view hidden" id="view-stats">
+    <div class="page-head"><div><h1>Estatísticas</h1><p class="muted">Análise visual das tarefas</p></div></div>
+    <div class="charts-grid">
+      <div class="card"><div class="card-head"><h3>Por Situação</h3></div><div class="card-body"><canvas id="chartSituacao"></canvas></div></div>
+      <div class="card"><div class="card-head"><h3>Por Prioridade</h3></div><div class="card-body"><canvas id="chartPrioridade"></canvas></div></div>
+      <div class="card"><div class="card-head"><h3>Por Responsável</h3></div><div class="card-body"><canvas id="chartResponsavel"></canvas></div></div>
+      <div class="card"><div class="card-head"><h3>Por Localização</h3></div><div class="card-body"><canvas id="chartLocalizacao"></canvas></div></div>
+      <div class="card wide"><div class="card-head"><h3>Tarefas por mês</h3></div><div class="card-body"><canvas id="chartMes"></canvas></div></div>
+    </div>
+  </section>
+  <!-- ============ CHAT ADMIN ============ -->
+  <section class="view" id="view-chat-admin">
+    <div class="view-header">
+      <h2>Atendimento</h2>
+    </div>
+    <div class="chat-admin-container">
+      <div class="chat-admin-sidebar" id="chatAdminList">
+        <!-- Lista de conversas injetada via JS -->
+      </div>
+      <div class="chat-admin-main" id="chatAdminMain">
+        <div class="chat-empty-state">Selecione uma conversa</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ SETTINGS VIEW ============ -->
+  <section class="view" id="view-settings">
+    <div class="page-head">
+      <div>
+        <h1>Configurações</h1>
+        <p class="muted">Gerencie usuários e colunas do Kanban</p>
+      </div>
+    </div>
+    
+    <div class="grid-2">
+      <!-- Users -->
+      <div style="background:var(--surface); border:1px solid var(--border); border-radius:10px; padding:20px;">
+        <h3 style="margin-bottom:15px; border-bottom:1px solid var(--border); padding-bottom:10px;">Usuários</h3>
+        <div style="display:flex; gap:10px; margin-bottom:15px;">
+          <input type="text" id="newUserName" placeholder="Nome do Usuário" style="flex:1;" />
+          <input type="text" id="newUserPin" placeholder="PIN" style="width:70px;" maxlength="2" />
+          <button class="btn btn-primary" id="btnAddUser">Add</button>
+        </div>
+        <div id="usersList" style="display:flex; flex-direction:column; gap:8px;"></div>
+      </div>
+      
+      <!-- Columns -->
+      <div style="background:var(--surface); border:1px solid var(--border); border-radius:10px; padding:20px;">
+        <h3 style="margin-bottom:15px; border-bottom:1px solid var(--border); padding-bottom:10px;">Colunas do Kanban</h3>
+        <div style="display:flex; gap:10px; margin-bottom:15px;">
+          <input type="text" id="newColName" placeholder="Nome da Coluna" style="flex:1;" />
+          <button class="btn btn-primary" id="btnAddCol">Add</button>
+        </div>
+        <div id="colsList" style="display:flex; flex-direction:column; gap:8px;"></div>
+      </div>
+    </div>
+  </section>
+
+</main>
+
+<!-- ============ TASK MODAL ============ -->
+<div class="modal-backdrop" id="taskModal">
+  <div class="modal modal-lg">
+    <div class="modal-head">
+      <h2 id="taskModalTitle"><i class="fa-solid fa-clipboard-list"></i> Nova Tarefa</h2>
+      <div id="modalTimeBadge" style="display:none; font-size:12px; background:var(--surface-2); padding:4px 8px; border-radius:12px; border:1px solid var(--border); color:var(--text); margin-left: 12px;"><i class="fa-solid fa-clock"></i> <span></span></div>
+      <div style="flex:1"></div>
+      <button type="button" class="btn btn-ghost" id="btnImportOS" style="font-size:12px; padding:6px 10px; display:none;"><i class="fa-solid fa-file-pdf"></i> Importar PDF</button>
+      <input type="file" id="importOSFile" accept="application/pdf" style="display:none;" />
+      <button class="icon-btn" data-close><i class="fa-solid fa-xmark"></i></button>
+    </div>
+    <div class="modal-tabs">
+      <button class="tab active" data-tab="dados">Dados</button>
+      <button class="tab" data-tab="ocorrencias">Ocorrências</button>
+      <button class="tab" data-tab="historico">Histórico</button>
+    </div>
+    <form id="taskForm">
+      <div class="modal-body tab-panel" data-panel="dados">
+        <div class="grid-3">
+          <div class="field"><label>Número</label><input name="numero" placeholder="Ex: OS 14163943" /></div>
+          <div class="field"><label>Cliente</label><input name="cliente" placeholder="Ex: UNOCHAPECO" /></div>
+          <div class="field"><label>Fluxo</label><input name="fluxo" placeholder="Ex: 1310194" /></div>
+        </div>
+        <div class="field">
+          <label style="display:flex; justify-content:space-between; align-items:center;">
+             <span>Descrição</span>
+             <button type="button" id="btnAutoFill" class="btn btn-ghost" style="font-size:12px; padding:2px 8px; color: var(--orange);">
+                <i class="fa-solid fa-bolt"></i> Extrair Dados
+             </button>
+          </label>
+          <textarea name="descricao" id="descInput" rows="2" required placeholder="Resumo da tarefa"></textarea></div>
+        <div class="grid-3">
+          <div class="field"><label>Pedido</label><input name="pedido" placeholder="Ex: 1622080" /></div>
+          <div class="field"><label>Quantidade</label><input type="number" name="quantidade" placeholder="Ex: 160" /></div>
+          <div class="field"><label>Qualidade</label>
+            <select name="qualidade">
+              <option value="">—</option><option>A</option><option>B</option><option>C</option><option>D</option>
+            </select></div>
+        </div>
+        <div class="grid-2">
+          <div class="field"><label>Produtos</label><textarea name="produtos" rows="3" placeholder="Ex: Notebook I5..."></textarea></div>
+          <div class="field"><label>Acessórios</label><textarea name="acessorios" rows="3" placeholder="Ex: Mouse, Teclado..."></textarea></div>
+        </div>
+        <div class="grid-3">
+          <div class="field"><label>Prioridade</label>
+            <select name="prioridade">
+              <option>Muito Alta</option><option selected>Alta</option><option>Média</option><option>Baixa</option>
+            </select></div>
+          <div class="field"><label>Responsável</label><input name="responsavel" placeholder="Ex: Comercial CHECKLIST" /></div>
+          <div class="field"><label>Localização</label>
+            <select name="localizacao">
+              <option selected>PCP</option>
+              <option>Padronização</option><option>Embalagem</option><option>Limpeza</option>
+              <option>Estoque</option><option>Rack1</option><option>Rack2</option>
+            </select></div>
+        </div>
+        <div class="grid-3">
+          <div class="field"><label>Data de Início</label><input type="date" name="dataInicio" /></div>
+          <div class="field"><label>Prazo</label><input type="date" name="prazo" /></div>
+          <div class="field"><label>Situação</label>
+            <select name="situacao">
+              <option>Não iniciada</option><option selected>Em andamento</option>
+              <option>Aguardando</option><option>Concluída</option>
+              <option>Atrasada</option><option>Cancelada</option>
+            </select></div>
+        </div>
+        <div class="grid-2">
+          <div class="field"><label>Data Produção</label><input type="date" name="dataProducao" /></div>
+          <div class="field"><label>Data Embalagem</label><input type="date" name="dataEmbalagem" /></div>
+        </div>
+        <div class="field"><label>Observações / Histórico de Anotações</label>
+          <div style="display:flex; gap:10px; margin-bottom:10px;">
+            <input type="text" id="newObsInput" placeholder="Adicionar nova anotação..." style="flex:1;" />
+            <button type="button" class="btn btn-ghost" id="btnAddObs"><i class="fa-solid fa-plus"></i> Add</button>
+          </div>
+          <ul id="obsList" style="list-style:none; padding:0; margin:0; display:flex; flex-direction:column; gap:8px; max-height:200px; overflow-y:auto; border:1px solid var(--border); border-radius:6px; padding:10px; background:var(--surface-2);"></ul>
+        </div>
+        <div class="field">
+          <label>Anexos (em breve)</label>
+          <div class="dropzone-disabled"><i class="fa-solid fa-paperclip"></i> Estrutura preparada — upload disponível na integração com Cloud</div>
+        </div>
+      </div>
+
+      <div class="modal-body tab-panel hidden" data-panel="ocorrencias">
+        <div class="occ-add">
+          <textarea id="occInput" rows="2" placeholder="Registrar nova ocorrência..."></textarea>
+          <button type="button" class="btn btn-primary" id="btnAddOcc"><i class="fa-solid fa-plus"></i> Registrar</button>
+        </div>
+        <ul class="occ-list" id="occList"></ul>
+      </div>
+
+      <div class="modal-body tab-panel hidden" data-panel="historico">
+        <ul class="timeline" id="historyList"></ul>
+      </div>
+
+      <div class="modal-foot">
+        <button type="button" class="btn btn-danger-ghost" id="btnDelete" style="display:none;"><i class="fa-solid fa-trash"></i> Excluir</button>
+        <button type="button" class="btn btn-ghost" id="btnDuplicate" style="display:none;"><i class="fa-solid fa-copy"></i> Duplicar</button>
+        <div style="flex:1"></div>
+        <button type="button" class="btn btn-ghost" data-close>Cancelar</button>
+        <button type="submit" class="btn btn-primary"><i class="fa-solid fa-check"></i> Salvar</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- ============ CONFIRM MODAL ============ -->
+<div class="modal-backdrop" id="confirmModal">
+  <div class="modal modal-sm">
+    <div class="modal-head"><h2><i class="fa-solid fa-circle-question"></i> Confirmar</h2></div>
+    <div class="modal-body"><p id="confirmMsg"></p></div>
+    <div class="modal-foot">
+      <button class="btn btn-ghost" data-close>Cancelar</button>
+      <button class="btn btn-danger" id="confirmYes">Confirmar</button>
+    </div>
+  </div>
+</div>
+
+<!-- ============ PROMPT MODAL ============ -->
+<div class="modal-backdrop" id="promptModal">
+  <div class="modal modal-sm">
+    <div class="modal-head"><h2><i class="fa-solid fa-arrows-split-up-and-left"></i> Fracionar Quantidade</h2></div>
+    <div class="modal-body">
+      <p id="promptMsg" style="margin-bottom: 10px;"></p>
+      <div class="field">
+        <input type="number" id="promptInput" min="1" step="1" style="font-size: 16px; padding: 10px;" />
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-ghost" data-close>Cancelar</button>
+      <button class="btn btn-primary" id="promptYes">Mover</button>
+    </div>
+  </div>
+</div>
+
+<!-- ============ FILTER MODAL ============ -->
+<div class="modal-backdrop" id="filterModal">
+  <div class="modal modal-sm">
+    <div class="modal-head"><h2><i class="fa-solid fa-filter"></i> Mostrar Colunas</h2><button class="icon-btn" data-close><i class="fa-solid fa-xmark"></i></button></div>
+    <div class="modal-body">
+      <p class="muted" style="margin-bottom:15px;">Marque as colunas que deseja ver no Kanban:</p>
+      <div id="filterColList" style="display:flex; flex-direction:column; gap:10px;"></div>
+    </div>
+  </div>
+</div>
+
+<!-- Toast -->
+<div id="toast" class="toast"></div>
+
+</div> <!-- Fechamento da class="layout" que provavelmente falta aqui ou é de cima -->
+
+  <!-- ============ CHAT OPERATOR (Flutuante) ============ -->
+  <button id="chat-fab" class="chat-fab">
+    <i class="fa-solid fa-comment-dots"></i>
+    <span id="chat-fab-badge" class="chat-badge" style="display:none;">0</span>
+  </button>
+
+  <div id="chat-popup" class="chat-popup" style="display:none;">
+    <div class="chat-popup-header">
+      <div class="chat-popup-title">
+        <i class="fa-solid fa-headset"></i> Suporte SGP
+      </div>
+      <button id="chat-popup-close"><i class="fa-solid fa-xmark"></i></button>
+    </div>
+    <div class="chat-popup-body" id="chatPopupBody">
+      <!-- Mensagens Injetadas via JS -->
+    </div>
+    <div class="chat-popup-footer">
+      <input type="text" id="chatPopupInput" placeholder="Digite sua mensagem..." autocomplete="off"/>
+      <button id="chatPopupSend"><i class="fa-solid fa-paper-plane"></i></button>
+    </div>
+  </div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.min.js"></script>
+<script>
+  pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.worker.min.js';
+</script>
+<script src="utils.js"></script>
+<script src="storage.js"></script>
+<script src="auth.js"></script>
+<script src="chat.service.js"></script>
+<script src="chat.js"></script>
+<script src="settings.js"></script>
+<script src="dashboard.js"></script>
+<script src="kanban.js"></script>
+<script src="calendar.js"></script>
+<script src="charts.js"></script>
+<script src="parser.js"></script>
+<script src="script.js"></script>
+</body>
+</html>
