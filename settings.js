@@ -16,7 +16,12 @@ const Settings = (() => {
           <span style="color:var(--muted); font-family:monospace; background:var(--surface-2); padding:2px 6px; border-radius:4px;">PIN: ${Utils.escapeHtml(u.pin)}</span>
           ${u.role === 'admin' ? '<span style="margin-left:10px; color:var(--orange); font-size:12px;">ADMIN</span>' : ''}
         </div>
-        ${u.role !== 'admin' ? `<button class="icon-btn" style="color:var(--red)" onclick="Settings.delUser('${u.id}')"><i class="fa-solid fa-trash"></i></button>` : ''}
+        ${u.role !== 'admin' ? `
+          <div style="display:flex; gap:8px;">
+            <button class="icon-btn" style="color:var(--primary)" onclick="Settings.editUser('${u.id}')" title="Editar"><i class="fa-solid fa-pen"></i></button>
+            <button class="icon-btn" style="color:var(--red)" onclick="Settings.delUser('${u.id}')" title="Excluir"><i class="fa-solid fa-trash"></i></button>
+          </div>
+        ` : ''}
       </div>
     `).join('');
   };
@@ -47,6 +52,23 @@ const Settings = (() => {
     renderUsers();
   };
 
+  const editUser = (id) => {
+    let users = Storage.users.all();
+    const u = users.find(x => x.id === id);
+    if (!u) return;
+    const newName = prompt('Novo nome para o operador:', u.nome);
+    if (!newName) return;
+    const newPin = prompt('Novo PIN (2 dígitos):', u.pin);
+    if (!newPin || newPin.length !== 2) return Utils.toast('PIN inválido (deve ter 2 dígitos)', 'error');
+    if (newPin !== u.pin && users.some(x => x.pin === newPin)) return Utils.toast('Esse PIN já está em uso', 'error');
+    
+    u.nome = newName.trim();
+    u.pin = newPin.trim();
+    Storage.users.save(users);
+    renderUsers();
+    Utils.toast('Operador atualizado com sucesso');
+  };
+
   // ----- COLUMNS -----
   const renderCols = () => {
     const list = document.getElementById('colsList');
@@ -56,7 +78,10 @@ const Settings = (() => {
           <input type="color" class="col-color-picker" value="${c.color || '#888888'}" onchange="Settings.updateColColor('${c.id}', this.value)" style="width:20px; height:20px; cursor:pointer;" title="Mudar cor" />
           <strong>${Utils.escapeHtml(c.id)}</strong>
         </div>
-        <button class="icon-btn" style="color:var(--red)" onclick="Settings.delCol('${c.id}')"><i class="fa-solid fa-trash"></i></button>
+        <div style="display:flex; gap:8px;">
+          <button class="icon-btn" style="color:var(--primary)" onclick="Settings.editCol('${c.id}')" title="Editar"><i class="fa-solid fa-pen"></i></button>
+          <button class="icon-btn" style="color:var(--red)" onclick="Settings.delCol('${c.id}')" title="Excluir"><i class="fa-solid fa-trash"></i></button>
+        </div>
       </div>
     `).join('');
     
@@ -86,6 +111,41 @@ const Settings = (() => {
     renderCols();
   };
 
+  const editCol = async (id) => {
+    let cols = Storage.columns.all();
+    const c = cols.find(x => x.id === id);
+    if (!c) return;
+    
+    const newName = prompt('Novo nome para a coluna (Isso atualizará todas as tarefas nela):', c.id);
+    if (!newName) return;
+    const cleanName = newName.trim();
+    if (cleanName === c.id) return;
+    if (cols.some(x => x.id.toLowerCase() === cleanName.toLowerCase())) return Utils.toast('Coluna já existe', 'error');
+
+    // 1. Atualizar as tarefas que estavam nessa coluna
+    const tasks = Storage.all();
+    let tasksChanged = 0;
+    for (let t of tasks) {
+      if (t.situacao === c.id) {
+        Storage.update(t.id, { situacao: cleanName });
+        tasksChanged++;
+      }
+    }
+
+    // 2. Deletar a coluna antiga no banco (se estiver online)
+    if (window.supabaseClient) {
+      await window.supabaseClient.from('sgp_columns').delete().eq('id', c.id);
+    }
+    
+    // 3. Atualizar e salvar
+    c.id = cleanName;
+    await Storage.columns.save(cols);
+    
+    renderCols();
+    if (window.Kanban && typeof Kanban.refresh === 'function') Kanban.refresh();
+    Utils.toast(`Coluna alterada! ${tasksChanged} tarefas movidas.`);
+  };
+
   const updateColColor = (id, color) => {
     let cols = Storage.columns.all();
     const c = cols.find(c => c.id === id);
@@ -96,7 +156,7 @@ const Settings = (() => {
     }
   };
 
-  return { init, delUser, delCol, updateColColor, renderCols, renderUsers };
+  return { init, delUser, editUser, delCol, editCol, updateColColor, renderCols, renderUsers };
 })();
 
 document.addEventListener('DOMContentLoaded', Settings.init);
