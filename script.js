@@ -443,6 +443,8 @@
         data.anexoUrl = uploadData.url;
         data.anexoNome = uploadData.name;
         data.anexoPath = uploadData.path;
+      } else {
+        Utils.toast('Erro ao fazer upload do PDF! O arquivo foi ignorado.', 'error');
       }
     }
 
@@ -573,7 +575,7 @@
         Utils.toast('Erro ao processar PDF', 'error');
       } finally {
         btnImportOS.innerHTML = '<i class="fa-solid fa-file-pdf"></i> Importar PDF';
-        importOSFile.value = '';
+        // Não limpa o importOSFile.value aqui para não destruir a referência do arquivo no navegador
       }
     });
   }
