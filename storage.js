@@ -165,6 +165,22 @@ const Storage = (() => {
     }
   };
 
+  const uploadFile = async (file) => {
+    const ext = file.name.split('.').pop();
+    const fileName = `${Utils.uid()}.${ext}`;
+    const { data, error } = await supabase.storage.from('anexos').upload(fileName, file, { cacheControl: '3600', upsert: false });
+    if (error) {
+      console.error('Erro no upload', error);
+      return null;
+    }
+    const { data: publicData } = supabase.storage.from('anexos').getPublicUrl(fileName);
+    return { url: publicData.publicUrl, name: file.name, path: fileName };
+  };
+
+  const deleteFile = async (path) => {
+    await supabase.storage.from('anexos').remove([path]);
+  };
+
   return { init, all, get, create, update, remove, duplicate, addOcorrencia, addAnotacao, replaceAll,
-           users, columns,  };
+           users, columns, uploadFile, deleteFile };
 })();

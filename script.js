@@ -259,6 +259,7 @@
   const openTaskModal = (id = null) => {
     state.editingId = id;
     state.importData = null;
+    state.pendingAnexo = null;
     const t = id ? Storage.get(id) : null;
     document.getElementById('taskModalTitle').innerHTML =
       `<i class="fa-solid fa-clipboard-list"></i> ${t ? 'Editar Tarefa' : 'Nova Tarefa'}`;
@@ -283,6 +284,7 @@
     renderOccurrences(t);
     renderHistory(t);
     renderAnotacoes(t);
+    renderAnexos(t);
     
     // Apply read-only permissions
     const user = Storage.currentUser;
@@ -361,6 +363,7 @@
         </li>`).join('')
       : `<p class="muted">Sem histórico.</p>`;
   };
+  
   const renderAnotacoes = (t) => {
     const list = document.getElementById('obsList');
     const a = (t?.anotacoes) || [];
@@ -372,6 +375,35 @@
           <div style="font-size:13px;">${Utils.escapeHtml(o.texto)}</div>
         </li>`).join('')
       : `<p class="muted" style="margin:0; font-size:13px;">Nenhuma anotação.</p>`;
+  };
+
+  const renderAnexos = (t) => {
+    const viewer = document.getElementById('attachmentViewer');
+    const msg = document.getElementById('noAttachmentMsg');
+    const name = document.getElementById('attachmentName');
+    const btnDown = document.getElementById('btnDownloadAttachment');
+    const iframe = document.getElementById('attachmentIframe');
+    const btnRem = document.getElementById('btnRemoveAttachment');
+    
+    if (t && t.anexoUrl) {
+      viewer.style.display = 'block';
+      msg.style.display = 'none';
+      name.textContent = t.anexoNome || 'Anexo';
+      btnDown.href = t.anexoUrl;
+      iframe.src = t.anexoUrl;
+      btnRem.onclick = () => {
+        askConfirm('Tem certeza que deseja excluir o anexo?', async () => {
+          if (t.anexoPath) Storage.deleteFile(t.anexoPath);
+          Storage.update(t.id, { anexoUrl: null, anexoNome: null, anexoPath: null });
+          renderAnexos(Storage.get(t.id));
+          Utils.toast('Anexo removido');
+        });
+      };
+    } else {
+      viewer.style.display = 'none';
+      msg.style.display = 'block';
+      iframe.src = '';
+    }
   };
 
   document.getElementById('btnAddOcc').addEventListener('click', () => {
@@ -397,6 +429,23 @@
   form.addEventListener('submit', e => {
     e.preventDefault();
     const data = Object.fromEntries(new FormData(form).entries());
+    const btnSubmit = document.querySelector('#taskForm .modal-foot button[type="submit"]');
+    const originalText = btnSubmit.innerHTML;
+
+    let uploadData = null;
+    if (state.pendingAnexo) {
+      btnSubmit.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Salvando Anexo...';
+      btnSubmit.disabled = true;
+      uploadData = await Storage.uploadFile(state.pendingAnexo);
+      btnSubmit.innerHTML = originalText;
+      btnSubmit.disabled = false;
+      if (uploadData) {
+        data.anexoUrl = uploadData.url;
+        data.anexoNome = uploadData.name;
+        data.anexoPath = uploadData.path;
+      }
+    }
+
     if (state.editingId) {
       Storage.update(state.editingId, data);
       Utils.toast('Tarefa atualizada');
@@ -513,8 +562,9 @@
           
           // Salvar tudo no state
           state.importData = parsed;
+          state.pendingAnexo = file;
           
-          Utils.toast('PDF lido com sucesso!');
+          Utils.toast('PDF lido com sucesso e anexado!');
         } else {
           Utils.toast('Não foi possível ler a OS', 'error');
         }

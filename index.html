@@ -334,12 +334,24 @@
             <button type="button" class="btn btn-ghost" id="btnAddObs"><i class="fa-solid fa-plus"></i> Add</button>
           </div>
           <ul id="obsList" style="list-style:none; padding:0; margin:0; display:flex; flex-direction:column; gap:8px; max-height:200px; overflow-y:auto; border:1px solid var(--border); border-radius:6px; padding:10px; background:var(--surface-2);"></ul>
+          </div>
+          <div class="field">
+            <label>Anexos</label>
+            <div id="attachmentsContainer">
+              <div class="dropzone-disabled" id="noAttachmentMsg" style="margin-bottom:10px;"><i class="fa-solid fa-paperclip"></i> Nenhum anexo importado.</div>
+              <div id="attachmentViewer" style="display:none; border:1px solid var(--border); border-radius:8px; overflow:hidden;">
+                <div style="display:flex; justify-content:space-between; align-items:center; background:var(--surface-2); padding:10px; border-bottom:1px solid var(--border);">
+                  <strong id="attachmentName" style="font-size:13px;"></strong>
+                  <div>
+                    <a id="btnDownloadAttachment" href="#" target="_blank" class="btn btn-ghost" style="font-size:12px; padding:4px 8px;"><i class="fa-solid fa-download"></i> Baixar</a>
+                    <button type="button" id="btnRemoveAttachment" class="btn btn-ghost" style="font-size:12px; padding:4px 8px; color:var(--red);"><i class="fa-solid fa-trash"></i></button>
+                  </div>
+                </div>
+                <iframe id="attachmentIframe" src="" width="100%" height="400px" style="border:none; display:block;"></iframe>
+              </div>
+            </div>
+          </div>
         </div>
-        <div class="field">
-          <label>Anexos (em breve)</label>
-          <div class="dropzone-disabled"><i class="fa-solid fa-paperclip"></i> Estrutura preparada — upload disponível na integração com Cloud</div>
-        </div>
-      </div>
 
       <div class="modal-body tab-panel hidden" data-panel="ocorrencias">
         <div class="occ-add">
