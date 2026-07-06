@@ -426,7 +426,7 @@
     renderAnotacoes(t);
   });
 
-  form.addEventListener('submit', e => {
+  form.addEventListener('submit', async e => {
     e.preventDefault();
     const data = Object.fromEntries(new FormData(form).entries());
     const btnSubmit = document.querySelector('#taskForm .modal-foot button[type="submit"]');
