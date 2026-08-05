@@ -15,18 +15,26 @@ window.Parser = {
     const numMatch = t.match(/\b(14\d{6})\b/);
     if (numMatch) result.numero = `OS ${numMatch[1]}`;
 
-    // 2. Cliente (Setor)
+    // 2. Cliente e Setor
+    const nomeClienteMatch = t.match(/Nome Cliente\s*:\s*(.*?)(?:CPF\/CNPJ|Endereço|Bairro|$|\n)/i);
     const setorMatch = t.match(/Setor:\s*(.*?)(?:Fone:|$|\n)/i);
-    if (setorMatch) result.cliente = setorMatch[1].trim();
+    
+    let clienteNome = nomeClienteMatch ? nomeClienteMatch[1].trim() : '';
+    let setorNome = setorMatch ? setorMatch[1].trim() : '';
+    
+    if (clienteNome && setorNome && !clienteNome.includes(setorNome) && !setorNome.includes(clienteNome)) {
+      result.cliente = `${clienteNome} (${setorNome})`;
+    } else {
+      result.cliente = clienteNome || setorNome;
+    }
 
     // 3. Descrição completa (Problema -> vai virar anotação)
-    // From "Problema :" down to "CÓDIGO"
-    const probMatch = t.match(/Problema\s*:\s*([\s\S]*?)CÓDIGO/i);
+    const probMatch = t.match(/Problema\s*:\s*([\s\S]*?)(?:DESCRI(?:Ç|C)(?:Ã|A)O\s+DOS\s+SERVI(?:Ç|C)OS|C(?:Ó|O)DIGO)/i);
     if (probMatch) {
       result.checklistCompleto = probMatch[1].trim();
       
-      // 4. Fluxo e Pedido (extraídos de dentro da descrição/problema)
-      const fluxoMatch = result.checklistCompleto.match(/FLUXO:\s*(\d+)/i);
+      // 4. Fluxo e Pedido
+      const fluxoMatch = result.checklistCompleto.match(/FLUXO:\s*(\d+)/i) || setorNome.match(/FLUXO:\s*(\d+)/i);
       if (fluxoMatch) result.fluxo = fluxoMatch[1];
       
       const pedidoMatch = result.checklistCompleto.match(/PEDIDO:\s*([\d,\s]+)/i);
@@ -34,8 +42,8 @@ window.Parser = {
     }
 
     // 5. Produtos (Tabela inferior)
-    // Text between "USADO S" and "DESCRIÇÃO DOS SERVIÇOS:"
-    const tableMatch = t.match(/USADO\s+S([\s\S]*?)DESCRIÇÃO\s+DOS\s+SERVIÇOS:/i);
+    // The table starts after "USADO S" and ends before "OBSERVAÇÕES/SOLUÇÃO:" or "SEDEX"
+    const tableMatch = t.match(/USADO\s+S([\s\S]*?)(?:OBSERVA(?:Ç|C)(?:Õ|O)ES\/SOLU(?:Ç|C)(?:Ã|A)O:|SEDEX|TRANSPORTADORA|$)/i);
     if (tableMatch) {
       const tableText = tableMatch[1];
       // Split by checkboxes "[ ] [ ]"
@@ -58,7 +66,9 @@ window.Parser = {
         const desc = words.join(' ').replace(/^ME\d+[A-Z]*\s+/, '').replace(/\s+ME\d+[A-Z]*$/, '').trim();
         if (!desc) return;
         
-        const isPai = /SERVIDOR|MICRO\sCOMPUTADOR|DESK|DESKTOP|NOTEBOOK|MONITOR|CPU/i.test(desc);
+        const hasPaiKeyword = /SERVIDOR|MICRO\sCOMPUTADOR|DESK|DESKTOP|NOTEBOOK|MONITOR|CPU/i.test(desc);
+        const isAccessoryKeyword = /FONTE|CABO|TECLADO|MOUSE|MOUSES/i.test(desc);
+        const isPai = hasPaiKeyword && !isAccessoryKeyword;
         const item = { nome: desc, qtd: qty, pai: isPai };
         
         if (isPai) result.produtos.push(item);
@@ -69,7 +79,7 @@ window.Parser = {
     // Fallback if table parsing fails but we have "05 UNIDADES CPU..." in description
     if (result.produtos.length === 0 && result.checklistCompleto) {
       // Extract multiple primary products (Pais) and grab their full text until another product/accessory or asterisk starts
-      const regexPais = /(\d+)\s*(?:UNIDADES?|UN)?\s*((?:CPU|DESK|MONITOR|NOTEBOOK|SERVIDOR).*?)(?=\s*(?:\d+\s*(?:TECLADO|MOUSE|MOUSES|CABO|FONTE|UNIDADES?|UN|CPU|DESK|MONITOR|NOTEBOOK|SERVIDOR)|\*|$))/gi;
+      const regexPais = /(\d+)\s*(?:UNIDADES?|UN|-)?\s*((?:CPU|DESK|MONITOR|NOTEBOOK|SERVIDOR).*?)(?=\s*(?:\d+\s*(?:TECLADO|MOUSE|MOUSES|CABO|FONTE|UNIDADES?|UN|-|CPU|DESK|MONITOR|NOTEBOOK|SERVIDOR)|\*|$))/gi;
       const paisMatches = [...result.checklistCompleto.matchAll(regexPais)];
       
       if (paisMatches.length > 0) {
