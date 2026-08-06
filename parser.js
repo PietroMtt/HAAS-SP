@@ -42,16 +42,13 @@ window.Parser = {
     }
 
     // 5. Produtos (Tabela inferior)
-    // The table starts after "USADO S" and ends before "OBSERVAÇÕES/SOLUÇÃO:" or "SEDEX"
-    const tableMatch = t.match(/USADO\s+S([\s\S]*?)(?:OBSERVA(?:Ç|C)(?:Õ|O)ES\/SOLU(?:Ç|C)(?:Ã|A)O:|SEDEX|TRANSPORTADORA|$)/i);
-    if (tableMatch) {
-      const tableText = tableMatch[1];
-      // Split by checkboxes "[ ] [ ]"
-      const chunks = tableText.split(/\[\s*\]\s*\[\s*\]/);
-      
-      chunks.forEach(chunk => {
-        chunk = chunk.trim();
-        if (!chunk) return;
+    // Extrai linhas que começam com o código do produto "ME..." seguidas de texto até as caixas de seleção "[ ] [ ]"
+    const regexTableItems = /(ME\d+[A-Z]*\s+.*?)(?:\[.*?\]\s*\[.*?\])/gi;
+    const itemMatches = [...t.matchAll(regexTableItems)];
+    
+    if (itemMatches.length > 0) {
+      itemMatches.forEach(m => {
+        let chunk = m[1].trim();
         
         // The last word is the quantity
         const words = chunk.split(/\s+/);
