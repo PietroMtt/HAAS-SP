@@ -527,7 +527,19 @@
         for (let i = 1; i <= pdf.numPages; i++) {
           const page = await pdf.getPage(i);
           const content = await page.getTextContent();
-          const strings = content.items.map(item => item.str);
+          
+          // Ordenar os itens de texto pelas coordenadas (Y de cima para baixo, X da esquerda para a direita)
+          // Isso previne que PDFs mal formatados embaralhem as colunas da tabela
+          const items = content.items.slice().sort((a, b) => {
+            // Y is transform[5] (usually bottom-to-top, so higher Y is higher on page)
+            if (Math.abs(b.transform[5] - a.transform[5]) > 5) {
+              return b.transform[5] - a.transform[5];
+            }
+            // X is transform[4]
+            return a.transform[4] - b.transform[4];
+          });
+          
+          const strings = items.map(item => item.str);
           fullText += strings.join(' ') + '\n';
         }
         
@@ -543,7 +555,13 @@
           if (parsed.produtos && parsed.produtos.length > 0) {
             // Se houver produtos, gerar a Descrição base para o primeiro (ou único) card
             const p1 = parsed.produtos[0];
-            form.elements.descricao.value = `${parsed.cliente || ''} — ${p1.qtd} ${p1.nome}`.trim();
+            
+            if (parsed.checklistCompleto) {
+              form.elements.descricao.value = parsed.checklistCompleto;
+            } else {
+              form.elements.descricao.value = `${parsed.cliente || ''} — ${p1.qtd} ${p1.nome}`.trim();
+            }
+            
             form.elements.quantidade.value = p1.qtd;
             
             if (parsed.produtos.length === 1) {
@@ -552,7 +570,11 @@
               form.elements.produtos.value = `Atenção: Serão gerados ${parsed.produtos.length} Cards separados.\n` + parsed.produtos.map(p => `${p.qtd}x ${p.nome}`).join('\n');
             }
           } else {
-            form.elements.descricao.value = parsed.cliente || '';
+            if (parsed.checklistCompleto) {
+              form.elements.descricao.value = parsed.checklistCompleto;
+            } else {
+              form.elements.descricao.value = parsed.cliente || '';
+            }
             form.elements.produtos.value = '';
           }
           
